@@ -24,11 +24,13 @@ blog_post_form="""
 """
 post_listing="""
 <div>
-%(title)s
+<h2><a href="/unit3/blog/%(id)s">%(title)s</a><h2>
 </div>
 <div>
 %(post)s
 </div>
+</div>
+<em>Posted on %(date)s</em>
 """
 
 
@@ -46,7 +48,7 @@ class NewPost(BaseHandler):
         if title and post: 
             newpost = BlogPost(title=title, post=post)
             key = newpost.put()
-            self.redirect("/unit3/blog/%s"%newpost.id)
+            self.redirect("/unit3/blog/%s"%key.id())
         else:
             self.write(blog_post_form, 
                     {'title':title, 'post':post, 
@@ -57,8 +59,18 @@ class Blog(BaseHandler):
         if not post_id or post_id == None:
             posts = db.GqlQuery("SELECT * "
                     "FROM BlogPost ")
+            self.write("<h1>Pearls Before Swine</h1>")
             for post in posts:
-                self.write("post_listing" % {"title":post.title, "post":post.post})
+                
+                self.write(post_listing, {"title":post.title, 
+                    "post":post.post, "date":post.date_created,
+                    "id":post.key().id()})
         else:
-            self.write("List post %s <a href='./newpost'>Create Post</a>"%post_id)
+            posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
+            post = posts[0]
+            self.write(post_listing,  {"title":post.title, 
+                "post":post.post, "date":post.date_created,
+                "id":post.key().id()})
+            self.write("<h1>Pearls Before Swine</h1>")
+
 

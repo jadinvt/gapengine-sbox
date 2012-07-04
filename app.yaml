@@ -8,6 +8,9 @@ handlers:
 - url: .*
   script: helloworld.app
 
+builtins:
+- remote_api: on
+
 libraries:
 - name: webapp2
   version: "2.5.1"
