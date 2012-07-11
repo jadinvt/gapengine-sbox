@@ -7,13 +7,13 @@ from google.appengine.ext import db
 blog_post_form="""
 <form  method="post" action="/unit3/blog/newpost">
     <div>
-    <label for="title">Title: 
-    <input id="title"  name="title" 
+    <label for="subject">Title: 
+    <input id="subject"  name="subject" 
     value="%(title)s"/>
     </div>
     <div>
-    <label for="post">Post: 
-    <input id="post" name="post" value="%(post)s"/>
+    <label for="content">Post: 
+    <input id="content" name="content" value="%(post)s"/>
     </div>
     <div class = "error">
     %(error)s
