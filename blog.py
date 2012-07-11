@@ -1,7 +1,6 @@
 import webapp2
 import cgi
 import re
-from copy import deepcopy
 from models import BlogPost
 from google.appengine.ext import db
 
@@ -66,11 +65,12 @@ class Blog(BaseHandler):
                     "post":post.post, "date":post.date_created,
                     "id":post.key().id()})
         else:
-            posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
-            post = posts[0]
+            key = db.Key.from_path("BlogPost", int(post_id))
+            post = db.get(key)
+            #posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
+            self.write("<h1>Pearls Before Swine</h1>")
             self.write(post_listing,  {"title":post.title, 
                 "post":post.post, "date":post.date_created,
                 "id":post.key().id()})
-            self.write("<h1>Pearls Before Swine</h1>")
 
 
