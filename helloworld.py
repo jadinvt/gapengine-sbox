@@ -2,8 +2,9 @@ import webapp2
 import cgi
 import re
 from new_user import NewUser
-from blog import Blog, NewPost
+from blog import Blog, NewPost, Welcome
 from copy import deepcopy
+
 
 new_user_form="""
 <form  method="post" action="/unit2/new_user">
@@ -53,10 +54,6 @@ class MainPage(webapp2.RequestHandler):
         #self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write(form)
 
-class Welcome(webapp2.RequestHandler):
-    def get(self):
-        self.response.out.write("Welcome, %s" % self.request.get("username"))
-
 class TestHandler(webapp2.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/plain'
@@ -91,5 +88,6 @@ app = webapp2.WSGIApplication([('/', MainPage),
     ('/unit3/blog/(\d*)', Blog),
     ('/unit3/blog', Blog),
     ('/unit3/blog/newpost', NewPost),
-    ('/unit2/rot13', Rot13)],
+    ('/unit2/rot13', Rot13),
+    ('/unit4/signup', NewUser)],
     debug=True)

@@ -7,3 +7,10 @@ class BlogPost(db.Model):
     rating = db.RatingProperty()
     date_created = db.DateTimeProperty(auto_now_add=True)
     post = db.TextProperty(required=True)
+
+class User(db.Model):
+    """Models a site user."""
+    user_name = db.StringProperty(required=True)
+    password = db.StringProperty(required=True)
+    email = db.StringProperty()
+

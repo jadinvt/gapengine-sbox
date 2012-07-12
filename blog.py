@@ -37,6 +37,11 @@ class BaseHandler(webapp2.RequestHandler):
     def write(self, template='', dictionary={'title':'','post':'','error':''}):
         self.response.out.write(template %  dictionary)
         
+class Welcome(BaseHandler):
+    def get(self):
+        self.response.out.write("Welcome, %s" % 
+                self.request.cookies.get("name"))
+
 class NewPost(BaseHandler):
     def get(self):
         self.write(blog_post_form)
