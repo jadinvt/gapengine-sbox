@@ -1,7 +1,10 @@
 import webapp2
 import cgi
 import re
+from google.appengine.ext import db
+from models import User
 from copy import deepcopy
+import bcrypt
 
 new_user_form="""
 <form  method="post" action="/unit2/new_user">
@@ -38,6 +41,17 @@ class NewUser(BaseHandler):
     form_dict_blank={"username":'', "password":'', "verify":'',
             "email":'', "username_error":'', "password_error":'', 
             "verify_error": '', "email_error":''}
+    def create_user(self, user_dict):
+        user = User(user_name=user_dict['username'], 
+                password=bcrypt.hashpw(user_dict['password'],
+                    bcrypt.gensalt()), email=user_dict['email'])
+        user.put()
+
+    def set_cookie(self, username):
+        self.response.headers.add_header('Set-Cookie', 
+                str('name=%s; Path=/' % username))
+        
+
     def verify_username(self, username):
         user_regex = re.compile(r"^[1-zA-Z0-9_-]{3,20}$")
         return user_regex.match(username)
@@ -81,4 +95,6 @@ class NewUser(BaseHandler):
         if form_error:
             self.response.out.write(new_user_form % form_dict)
         else:
-            self.redirect("/unit2/welcome?username=%s"%self.request.get("username"))
+            self.create_user(form_dict)
+            self.set_cookie(form_dict['username'])
+            self.redirect("/unit2/welcome")

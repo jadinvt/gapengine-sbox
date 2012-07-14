@@ -4,7 +4,7 @@ import re
 from new_user import NewUser
 from blog import Blog, NewPost, Welcome
 from copy import deepcopy
-
+from login import Login, Logout
 
 new_user_form="""
 <form  method="post" action="/unit2/new_user">
@@ -84,10 +84,12 @@ class Rot13(webapp2.RequestHandler):
 app = webapp2.WSGIApplication([('/', MainPage),
     ('/testform', TestHandler),
     ('/unit2/new_user', NewUser),
-    ('/unit2/welcome', Welcome),
+    ('.*/welcome/?', Welcome),
     ('/unit3/blog/(\d*)', Blog),
     ('/unit3/blog', Blog),
+     ('.*/login/?$', Login),
     ('/unit3/blog/newpost', NewPost),
     ('/unit2/rot13', Rot13),
-    ('/unit4/signup', NewUser)],
+    ('.*/logout/?', Logout),
+    ('.*/signup/?', NewUser)],
     debug=True)

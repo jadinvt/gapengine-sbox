@@ -39,8 +39,12 @@ class BaseHandler(webapp2.RequestHandler):
         
 class Welcome(BaseHandler):
     def get(self):
-        self.response.out.write("Welcome, %s" % 
-                self.request.cookies.get("name"))
+        name = self.request.cookies.get("name")
+        if name:
+            self.response.out.write("Welcome, %s" % 
+                    self.request.cookies.get("name"))
+        else:
+            self.redirect("/unit4/signup")    
 
 class NewPost(BaseHandler):
     def get(self):
