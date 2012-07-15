@@ -19,7 +19,7 @@ skip_files:
 - bin
 handlers:
 - url: .*
-  script: urls.app
+  script: helloworld.app
 
 builtins:
 - remote_api: on

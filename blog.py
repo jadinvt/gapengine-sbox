@@ -1,8 +1,13 @@
 import webapp2
 import cgi
 import re
+import logging
+import json
 from models import BlogPost
 from google.appengine.ext import db
+from google.appengine.api import memcache
+from datetime import timedelta, datetime
+
 
 blog_post_form="""
 <form  method="post" action="/unit3/blog/newpost">
@@ -83,3 +88,67 @@ class Blog(BaseHandler):
                 "id":post.key().id()})
 
 
+def get_front_page():
+        posts_time = memcache.get("front_page")
+        if posts_time:
+            (posts, time) = posts_time
+            return posts, (datetime.now() - time).seconds        
+        logging.error("DB HIT")
+        posts = db.GqlQuery("SELECT * "
+                    "FROM BlogPost ")
+        posts = list(posts)
+        time = datetime.now()
+        memcache.set("front_page", (posts, time))
+        return posts, 0
+
+def get_individual_post(post_id):
+    post_time = memcache.get("BlogPost"+post_id)
+    if post_time:
+        (post, time) = post_time
+        return post, (datetime.now() - time).seconds
+    logging.error("DB HIT")
+    key = db.Key.from_path("BlogPost", int(post_id))
+    post = db.get(key)
+    time = datetime.now()
+    memcache.set("BlogPost"+post_id, (post, time))
+    return post, 0        
+
+class Blog(BaseHandler):
+    def get(self, post_id=None):
+        self.write("<h1>Pearls Before Swine</h1>")
+        if not post_id or post_id == None:
+            posts, age = get_front_page()
+            for post in posts:
+                
+                self.write(post_listing, {"title":post.title, 
+                    "post":post.post, "date":post.date_created.strftime("%A %d, %B %Y"),
+                    "id":post.key().id()})
+        else:
+            post, age = get_individual_post(post_id)
+            #posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
+            self.write(post_listing,  {"title":post.title, 
+                "post":post.post, "date":post.date_created.strftime("%A %d, %B %Y"),
+                "id":post.key().id()})
+        self.write("<div> <em>Last DB Query %s seconds ago.</em></div>" % age)
+        
+class BlogJson(BaseHandler):
+    def get(self, post_id=None):
+        data_to_jsonify = []
+        if not post_id or post_id == None:
+            posts, age = get_front_page()
+            for post in posts:
+                data_to_jsonify.append({"subject":post.title, 
+                    "content":post.post, "date":post.date_created.strftime("%A %d, %B %Y"),
+                    "id":str(post.key().id())})
+        else:
+            post, age = get_individual_post(post_id)
+            #posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
+            data_to_jsonify.append({"subject":post.title, 
+                "content":post.post, "date":post.date_created.strftime("%A %d, %B %Y"),
+                "id":str(post.key().id())})
+        self.response.out.write(json.dumps(data_to_jsonify))
+            
+class Flush(BaseHandler):
+    def get(self):
+        self.write("Flushing")
+        memcache.flush_all()
