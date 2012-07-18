@@ -20,6 +20,7 @@ login_form = """
     </div>
     <input type="submit" value="Submit">
     </form>
+    <a href="/signup">Signup</a>
 """
 
 class Logout(BaseHandler):
@@ -28,7 +29,10 @@ class Logout(BaseHandler):
                 str('%s=; Path=/' % cookie))
     def get(self):    
         self.unset_cookie("name")
-        self.redirect("/unit4/signup")
+        redirect = self.request.get("redirect")
+        if redirect:
+            self.redirect(redirect)
+        self.redirect("/login")
     
 class Login(BaseHandler):
     def check_password(self, password, hashed):
@@ -39,11 +43,15 @@ class Login(BaseHandler):
     def get(self):    
         self.write(login_form)
     def post(self):
-        q = db.Query(User)
-        q.filter("user_name =", self.request.get("username"))        
-        q.get()
-        if self.check_password(self.request.get("password"), q[0].password):
+        user = db.Query(User)
+        user.filter("user_name =", self.request.get("username"))        
+        user.get()
+        if user.count() and self.check_password(self.request.get("password"), 
+                user[0].password):
             self.set_cookie(self.request.get("username"))
+            redirect =  self.request.get("redirect")
+            if redirect:
+                self.redirect("redirect")
             self.redirect("/unit2/welcome")
         else:
             self.write(login_form, 

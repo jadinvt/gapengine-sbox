@@ -8,9 +8,20 @@ from google.appengine.ext import db
 from google.appengine.api import memcache
 from datetime import timedelta, datetime
 
-logged_in_wiki_header_edit = "<div>%(user_name)s | <a href='/logout'>logout </a>"
-logged_in_wiki_header_view = "<div><a href='wiki/_edit/%(wiki_page_name)s' %(user_name)s | <a href='/logout'>logout </a>"
-logged_out_wiki_header = "<div><a href='/login'>login</a>"
+logged_in_wiki_header_edit = """
+<div>%(user_name)s | <a href='/logout?redirect=%(wiki_page_name)s'>logout</a>
+"""
+
+logged_in_wiki_header_view = """
+<div><a href='/wiki/_edit%(wiki_page_name)s'>edit</a> 
+|%(user_name)s  (<a href='/logout?redirect='/wiki/%(wiki_page_name)s'>
+logout</a>)"""
+
+logged_out_wiki_header = """
+<div><a href='/login?redirect=%(wiki_page_name)s'>login</a>
+|<a href='/signup?redirect=%(wiki_page_name)s'>Signup</a>
+"""
+
 edit_wiki_form="""
 <form  method="post" action="/wiki/_edit%(wiki_page_name)s">
     <div>
@@ -187,15 +198,13 @@ class ViewWikiPage(BaseHandler):
             if user_name:
                 self.write(logged_in_wiki_header_view, {'user_name':user_name, 'wiki_page_name':wiki_page.subject})
             else:
-                self.write(logged_out_wiki_header)
+                self.write(logged_out_wiki_header, {'wiki_page_name':wiki_page_name})
                 
             self.write("<h2>%s</h2>" % re.sub('/','',wiki_page.subject))
             self.write(wiki_page.content)
             self.write("<div> <em>Queried %s seconds ago</em></div>" % age)            
         else:
             self.redirect("_edit%s" % wiki_page_name)            
-    def post(self):
-        self.write("Wikipage post")
 
 class EditWikiPage(BaseHandler):
     
@@ -203,18 +212,34 @@ class EditWikiPage(BaseHandler):
         user_name=self.request.cookies.get("name")
         user_object = get_user_object(user_name)
         if user_name:
-            self.write(logged_in_wiki_header_view, 
+            self.write(logged_in_wiki_header_edit, 
                     {'user_name':user_name, 'wiki_page_name': wiki_page_name})
         else:
-            self.redirect('./signin')        
+            self.redirect('/login')        
+
+        wiki_page, age = get_wiki_page(wiki_page_name)
+        if wiki_page:
+            content = wiki_page.content
+        else:
+            content = ''
         
-        self.write(edit_wiki_form, {'wiki_page_name':wiki_page_name, 'wiki_page_contents':"", 'error':""})
+        self.write(edit_wiki_form, {'wiki_page_name':wiki_page_name, 'wiki_page_contents':content, 'error':""})
     
     def post(self, wiki_page_name):
         content = self.request.get("content")
         subject = self.request.get("subject")
-        newpage = WikiPage(subject=subject, content=content)        
-        key = newpage.put()            
+        wiki_page, age = get_wiki_page(wiki_page_name)
+
+        if wiki_page:
+            logging.error("modifying existing page")
+            wiki_page.content = content
+            wiki_page.put()
+        else: 
+            logging.error("adding new page")
+            wiki_page = WikiPage(subject=subject, content=content)        
+            key = wiki_page.put()            
+        date_cached = datetime.now()
+        memcache.set(subject, (wiki_page, date_cached))
         logging.error("redirecting %s" % wiki_page_name)
         self.redirect("/wiki%s" % wiki_page_name)
     
