@@ -2,7 +2,7 @@ import webapp2
 import cgi
 import re
 from new_user import NewUser
-from blog import Blog, BlogJson, NewPost, Welcome, Flush
+from blog import EditWikiPage, ViewWikiPage, Blog, BlogJson, NewPost, Welcome, Flush
 from copy import deepcopy
 from login import Login, Logout
 
@@ -79,20 +79,23 @@ class Rot13(webapp2.RequestHandler):
                 rot13_text += character
 
         self.response.out.write(rot13_form % {"value":cgi.escape(rot13_text)})
-
+PAGE_RE = r'(/(?:[a-zA-Z0-9_-]+/?)*)'
 
 app = webapp2.WSGIApplication([('/', MainPage),
     ('/testform', TestHandler),
     ('/unit2/new_user', NewUser),
     ('.*/welcome/?', Welcome),
-    ('/unit3/blog/(\d*)/?\.json', BlogJson),
-    ('/unit3/blog/?\.json', BlogJson),    
-    ('/unit3/blog/(\d*)', Blog),
-    ('/unit3/blog', Blog),
+    ('.*/blog/(\d*)/?\.json', BlogJson),
+    ('.*/blog/?\.json', BlogJson),    
+    ('.*/blog/(\d*)', Blog),
+    ('.*/blog', Blog),
      ('.*/login/?$', Login),
      ('.*/flush/?$', Flush),     
-    ('/unit3/blog/newpost', NewPost),
+    ('.*/newpost', NewPost),
     ('/unit2/rot13', Rot13),
     ('.*/logout/?', Logout),
-    ('.*/signup/?', NewUser)],
+    ('.*/signup/?', NewUser),
+    ('.*/_edit' + PAGE_RE, EditWikiPage),
+    ('/wiki' + PAGE_RE, ViewWikiPage),
+    ],
     debug=True)

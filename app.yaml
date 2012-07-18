@@ -3,6 +3,9 @@ version: 3
 runtime: python27
 api_version: 1
 threadsafe: yes
+handlers:
+- url: .*
+  script: urls.app
 skip_files:
 - ^(.*/)?app\.yaml
 - ^(.*/)?app\.yml
@@ -14,12 +17,14 @@ skip_files:
 - ^(.*/)?.*/RCS/.*
 - ^(.*/)?\..*
 - ^(.*/)?.*\.bak$
-- include
-- lib
+- .git
+- .gitignore
 - bin
-handlers:
-- url: .*
-  script: urls.app
+- include
+- share
+- lib
+- local
+- build
 
 builtins:
 - remote_api: on
