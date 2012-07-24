@@ -2,7 +2,7 @@ import webapp2
 import cgi
 import re
 from new_user import NewUser
-from blog import EditWikiPage, ViewWikiPage, Blog, BlogJson, NewPost, Welcome, Flush
+from blog import EditWikiPage, ViewWikiPage, Blog, BlogJson, NewPost, Welcome, Flush, WikiPageHistory
 from copy import deepcopy
 from login import Login, Logout
 
@@ -96,6 +96,7 @@ app = webapp2.WSGIApplication([('/', MainPage),
     ('.*/logout/?', Logout),
     ('.*/signup/?', NewUser),
     ('.*/_edit' + PAGE_RE, EditWikiPage),
+    ('.*/_history' + PAGE_RE, WikiPageHistory),
     ('/wiki' + PAGE_RE, ViewWikiPage),
     ],
     debug=True)

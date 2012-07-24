@@ -14,6 +14,7 @@ class WikiPage(db.Model):
     """Models an individual page on our wiki."""
     subject = db.StringProperty(required=True)
     content = db.TextProperty(required=True)
+    version = db.IntegerProperty(required=True)
     author = db.UserProperty()
     rating = db.RatingProperty()
     date_created = db.DateTimeProperty(auto_now_add=True)

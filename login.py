@@ -1,5 +1,6 @@
 import webapp2
 import cgi
+import logging
 from google.appengine.ext import db
 from models import User
 from base import BaseHandler
@@ -30,9 +31,9 @@ class Logout(BaseHandler):
     def get(self):    
         self.unset_cookie("name")
         redirect = self.request.get("redirect")
+        logging.error("redirect %s"%redirect)
         if redirect:
             self.redirect(redirect)
-        self.redirect("/login")
     
 class Login(BaseHandler):
     def check_password(self, password, hashed):
