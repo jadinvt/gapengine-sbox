@@ -35,3 +35,5 @@ lib
 local
 share
 index.yaml
+.*pydevproject
+.metadata/

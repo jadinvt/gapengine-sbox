@@ -16,13 +16,13 @@ login_page="""
 <script type="text/javascript" src="jquery-1.3.1.js"></script>
 
 <script type="text/javascript">
-
+ alert("anyone?");
+ 
   // submitting the form in this state will cause OpenID discovery to be
   // performed. The other possible state ("password") means that submitting
   // the form actually is supposed to transmit a username/password to the
   // server.
   var state = "discovery";
-
   // renders the login form un-clickable. Also shows a "spinner" to indicate
   // that we're waiting for the server
   function disableLoginForm() {
@@ -30,7 +30,7 @@ login_page="""
       $("#submit > input").attr("disabled", "disabled");
       $("#spinner").css("display", "block");
   }
-
+  
   // makes it so that the login form is usable again. Hides the spinner.
   function enableLoginForm() {
       $("#openid").removeAttr("disabled");
@@ -54,8 +54,8 @@ login_page="""
     $("#password")[0].focus();
     $("#submit-button").attr("value", "Sign in");
   }
-
-  // Sets up the login form for "disvovery" mode. This is the initial state, in
+  
+   // Sets up the login form for "disvovery" mode. This is the initial state, in
   // which the user simply types in an email address, and upon hitting enter
   // (or pressing the submit button), we try to perform discovery on the domain
   // in the email address.
@@ -78,7 +78,7 @@ login_page="""
     $("#openid")[0].focus();
     $("#submit-button").attr("value", "Continue");
   }
-
+  
   // Gets called when the user submits the form in "discovery" mode. In that
   // mode, we don't actually submit the form (the caller of this function
   // cancels the default submit behavior). Instead, we send an AJAX request
@@ -122,30 +122,15 @@ login_page="""
       }
     }, "json");
   }
-
-  // called on page load
-  $(document).ready(function() {
-
-    // first, register a submit handler for the login form
-    $("form").submit(function(e) {
-      if (state === "discovery") {
-          // if state is "discovery" (i.e. no password field visible), we
-          // cancel the normal form submission process, and instead call
-          // startDiscovery.
-          e.preventDefault();
-          startDiscovery();
-      } // else we don't consume the event and the form
-        // gets submitted as usual (with username and password)
-    });
-
-    // then, setup the login form for the "discovery" state (i.e., hide
-    // password field, etc).
-    setupDiscoveredLogin();
-  });
+ // called on page load
+   $(document).ready(
+   function() {
+alert("hi");
+$("form").submit(function(e) {
+    alert("submit alert");
+      alert(discovery);})
 </script>
-
 </head>
-
 <body>
 
 <h1>Example Step2 Authentication and Authorization</h1>
@@ -159,21 +144,7 @@ Otherwise, you'll be asked for a password. <b>You can type any password you
 like at that point. DONT USE A REAL PASSWORD!!!</b>
 </p>
 
-<%
-  ParameterList requestParams =
-    (ParameterList) session.getAttribute("parameterlist");
-  if (requestParams != null) {
-    String errorMessage = requestParams.getParameterValue("errormessage");
-    if (errorMessage != null && errorMessage.length() > 0) {
-      System.out.println(errorMessage);
-%>
-  <p>An error occurred: <%= errorMessage %></p>
-<%
-    }
-  }
-%>
-
-<form id="form" method="post" action="/lso2">
+<form id="form" method="post" action="/login">
 <div id="loginform">
   <div id="preamble">
   Sign in with your<br/>
@@ -216,9 +187,9 @@ like at that point. DONT USE A REAL PASSWORD!!!</b>
   <input id="oauth" type="checkbox" name="oauth" value="yes" />Get OAuth Request token, then authorize
 </div>
 </form>
-
 </body>
-</html>"""
+</html>
+"""
 login_form = """
 <form  method="post" action="/unit4/login">
     <div>
@@ -259,17 +230,27 @@ class Logout(BaseHandler):
             self.redirect(redirect)
 
 
-class Login(webapp2.RequestHandler):
+class Login(BaseHandler):
     def get(self):
         user = users.get_current_user()
         if user:  # signed in already            
             self.response.out.write('Hello <em>%s</em>! [<a href="%s">sign out</a>]' % (
                 user.nickname(), users.create_logout_url(self.request.uri)))
         else:     # let user choose authenticator
-            self.response.out.write('Hello world! Sign in at: ')
-            for name, uri in providers.items():
-                self.response.out.write('[<a href="%s">%s</a>]' % (
-                    users.create_login_url(federated_identity=uri), name))
+            self.write(login_page)
+            #for name, uri in providers.items():
+            #    self.response.out.write('[<a href="%s">%s</a>]' % (
+            #        users.create_login_url(federated_identity=uri), name))
+    def post(self):
+        user = users.get_current_user()
+        if user:  # signed in already            
+            self.response.out.write('Hello <em>%s</em>! [<a href="%s">sign out</a>]' % (
+                user.nickname(), users.create_logout_url(self.request.uri)))
+        else:     # let user choose authenticator
+            self.write(login_page)
+            #for name, uri in providers.items():
+            #    self.response.out.write('[<a href="%s">%s</a>]' % (
+            #        users.create_login_url(federated_identity=uri), name))
     
 class OldLogin(BaseHandler):
     def check_password(self, password, hashed):
