@@ -6,6 +6,7 @@ threadsafe: yes
 handlers:
 - url: .*
   script: urls.app
+  secure: always
 skip_files:
 - ^(.*/)?app\.yaml
 - ^(.*/)?app\.yml
