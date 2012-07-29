@@ -1,22 +1,23 @@
 import webapp2
 import cgi
+import json
 import logging
 from google.appengine.ext import db
 from google.appengine.api import users
-from models import User
+from models import User, UserPrefs
 from base import BaseHandler
 import bcrypt
+import settings
 login_page="""
 <html>
 
 <head>
 <title>Example Step2 Authentication and Authorization</title>
-<link rel="stylesheet" href="style.css" type="text/css" />
 
-<script type="text/javascript" src="jquery-1.3.1.js"></script>
+<script type="text/javascript" src="/static/jquery-1.7.2.min.js"></script>
 
 <script type="text/javascript">
- alert("anyone?");
+ 
  
   // submitting the form in this state will cause OpenID discovery to be
   // performed. The other possible state ("password") means that submitting
@@ -28,7 +29,7 @@ login_page="""
   function disableLoginForm() {
       $("#openid").attr("disabled", "disabled");
       $("#submit > input").attr("disabled", "disabled");
-      $("#spinner").css("display", "block");
+      
   }
   
   // makes it so that the login form is usable again. Hides the spinner.
@@ -55,7 +56,7 @@ login_page="""
     $("#submit-button").attr("value", "Sign in");
   }
   
-   // Sets up the login form for "disvovery" mode. This is the initial state, in
+   // Sets up the login form for "discovery" mode. This is the initial state, in
   // which the user simply types in an email address, and upon hitting enter
   // (or pressing the submit button), we try to perform discovery on the domain
   // in the email address.
@@ -86,21 +87,17 @@ login_page="""
   // domain of the entered email address.
   function startDiscovery() {
     disableLoginForm();
-    $.post("lso2", {
+    
+    
+    $.post("/login", {
         // the email address entered by the user
         openid: $("#openid").val(),
-
+        
         // Other options checked on the page will be transmitted as
         // POST-body parameters. We format the request so that it looks just
         // like a regular submission of the form, with the POST-body parameter
         // "stage" set to the value "discovery".
-        email: $("#email").attr("checked") ? "yes" : "no",
-        country: $("#country").attr("checked") ? "yes" : "no",
-        language: $("#language").attr("checked") ? "yes" : "no",
-        firstName: $("#firstName").attr("checked") ? "yes" : "no",
-        lastName: $("#lastName").attr("checked") ? "yes" : "no",
-        usePost: $("#usePost").attr("checked") ? "yes" : "no",
-        oauth: $("#oauth").attr("checked") ? "yes" : "no",
+       
         stage: "discovery"
     },
 
@@ -123,26 +120,26 @@ login_page="""
     }, "json");
   }
  // called on page load
-   $(document).ready(
-   function() {
-alert("hi");
-$("form").submit(function(e) {
-    alert("submit alert");
-      alert(discovery);})
+  $(document).ready(function() {
+    // first, register a submit handler for the login form
+    $("form").submit(function(e) {
+      if (state === "discovery") {
+          e.preventDefault();
+          startDiscovery();
+      }
+       }
+       )
+        
+
+    // then, setup the login form for the "discovery" state (i.e., hide
+    // password field, etc).
+    setupDiscoveredLogin();
+  });
 </script>
 </head>
 <body>
 
-<h1>Example Step2 Authentication and Authorization</h1>
-
-<p>
-This example form will authenticate a user though an identity provider and
-optionally request user email and country attributes.</p>
-<p>
-If your email provider is an OpenID IdP you will be taken to your IdP.
-Otherwise, you'll be asked for a password. <b>You can type any password you
-like at that point. DONT USE A REAL PASSWORD!!!</b>
-</p>
+<h1>Login</h1>
 
 <form id="form" method="post" action="/login">
 <div id="loginform">
@@ -160,31 +157,9 @@ like at that point. DONT USE A REAL PASSWORD!!!</b>
   </div>
   <div id="submit">
     <input id="submit-button" type="submit" value="Continue"/>
-    <img id="spinner" src="ajax-loader.gif" style="display: none;" />
+   
   </div>
   <div style="clear:both;"></div>
-</div>
-<p>
-<div>
-  <input id="email" type="checkbox" name="email" value="yes" />AX Request email
-</div>
-<div>
-  <input id="country" type="checkbox" name="country" value="yes" />AX Request home country
-</div>
-<div>
-  <input id="language" type="checkbox" name="language" value="yes" />AX Request preferred language
-</div>
-<div>
-  <input id="firstName" type="checkbox" name="firstName" value="yes" />AX Request first name
-</div>
-<div>
-  <input id="lastName" type="checkbox" name="lastName" value="yes" />AX Request last name
-</div><hr />
-<div>
-  <input id="usePost" type="checkbox" name="usePost" value="yes" />Use POST instead of GET
-</div>
-<div>
-  <input id="oauth" type="checkbox" name="oauth" value="yes" />Get OAuth Request token, then authorize
 </div>
 </form>
 </body>
@@ -209,7 +184,7 @@ login_form = """
 """
 
 providers = {
-    'Google'   : 'www.google.com/accounts/o8/id', # shorter alternative: "Gmail.com"
+    'Google'   : 'gmail.com', # shorter alternative: "Gmail.com"
     'Yahoo'    : 'yahoo.com',
     'MySpace'  : 'myspace.com',
     'AOL'      : 'aol.com',
@@ -224,18 +199,34 @@ class Logout(BaseHandler):
                 str('%s=; Path=/' % cookie))
     def get(self):    
         self.unset_cookie("name")
+        user = users.get_current_user()
+        if user:
+            self.redirect(users.create_logout_url(self.request.uri))
+        
         redirect = self.request.get("redirect")
-        logging.error("redirect %s"%redirect)
+        logging.info("redirect %s"%redirect)
         if redirect:
             self.redirect(redirect)
-
+        else:
+            self.redirect('/')    
 
 class Login(BaseHandler):
     def get(self):
         user = users.get_current_user()
-        if user:  # signed in already            
+        if user:  # signed in already         
+            user.prefs = db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+            if not user.prefs:
+                user.prefs = UserPrefs(user_id=user.user_id())
+            user.prefs.put()    
             self.response.out.write('Hello <em>%s</em>! [<a href="%s">sign out</a>]' % (
                 user.nickname(), users.create_logout_url(self.request.uri)))
+            if user.prefs.can_edit:
+                self.write("You can edit!")
+            if user.prefs.is_admin:
+                self.write("You're an admin!")
+            
         else:     # let user choose authenticator
             self.write(login_page)
             #for name, uri in providers.items():
@@ -247,7 +238,16 @@ class Login(BaseHandler):
             self.response.out.write('Hello <em>%s</em>! [<a href="%s">sign out</a>]' % (
                 user.nickname(), users.create_logout_url(self.request.uri)))
         else:     # let user choose authenticator
-            self.write(login_page)
+            domain = self.request.POST.get('openid').split('@')[1]
+            login_url = users.create_login_url(federated_identity=domain)
+            self.response.headers.add_header('Content-Type' , 
+                                         'application/json; charset=UTF-8')
+            if domain in providers.values():
+                response_json = json.dumps({'status':'success', 'redirectUrl':login_url})                
+            else:
+                 response_json = json.dumps({'status':'error'})
+            logging.info(response_json)     
+            self.response.out.write(response_json)        
             #for name, uri in providers.items():
             #    self.response.out.write('[<a href="%s">%s</a>]' % (
             #        users.create_login_url(federated_identity=uri), name))

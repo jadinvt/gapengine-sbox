@@ -3,6 +3,8 @@ import cgi
 import re
 import logging
 import json
+import settings
+from google.appengine.api import users
 from models import BlogPost, WikiPage
 from google.appengine.ext import db
 from google.appengine.api import memcache
@@ -10,7 +12,26 @@ from datetime import timedelta, datetime
 
 #logging.basicConfig(level=logging.INFO)
 KEEP_HISTORY=True
+html_header="""
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="/static/base.css" />
+</head>
+<body>
+<div id="content">
+"""
 
+html_footer="""
+</div>
+</body>
+</html>
+"""
+
+edit_wiki_unauthorized_error ="""
+<div>You are not authorized to edit this page.</div>
+<div><a href="/login">Login</a>, <a href="/signup">signup</a>, or 
+<a href="/login">return to homepage.</a></div>
+"""
 logged_in_wiki_header_edit = """
 <div>%(user_name)s | 
 <a href='/logout?redirect=/wiki%(wiki_page_name)s'>logout</a>
@@ -104,9 +125,45 @@ class Welcome(BaseHandler):
 
 class NewPost(BaseHandler):
     def get(self):
+        user = users.get_current_user()
+        if not user:
+            logging.info("Not a user!")
+            self.write(html_header)
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)
+            return
+        user.prefs =  db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+        if not user.prefs.can_edit:
+            logging.info("user: %s can't edit." % user.nickname())
+            self.write(html_header)
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)            
+            return
+        self.write(html_header)
         self.write(blog_post_form)
+        self.write(html_footer)
+        
     
     def post(self):
+        user = users.get_current_user()
+        if not user:
+            logging.info("Not a user!")
+            self.write(html_header)
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)            
+            return
+        user.prefs =  db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+        if not user.prefs.can_edit:
+            logging.info("user: %s can't edit." % user.nickname())
+            self.write(html_header)
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)                   
+            return
+
         subject = self.request.get("subject")
         content = self.request.get("content")
         if subject and content: 
@@ -115,10 +172,11 @@ class NewPost(BaseHandler):
             memcache.set("front_page", None)
             self.redirect("/unit3/blog/%s"%key.id())
         else:
+            self.write(html_header)
             self.write(blog_post_form, 
                     {'subject':subject, 'content':content, 
                         'error':"Both subject and content are required."})
-
+            self.write(html_footer)       
 
 def get_front_page():
         posts_time = memcache.get("front_page")
@@ -147,7 +205,8 @@ def get_individual_post(post_id):
 
 class Blog(BaseHandler):
     def get(self, post_id=None):
-        self.write("<h1>Pearls Before Swine</h1>")
+        self.write(html_header)
+        self.write("<h1>%s</h1>"%settings.BLOG_NAME)
         if not post_id or post_id == None:
             posts, age = get_front_page()
             for post in posts:
@@ -162,6 +221,7 @@ class Blog(BaseHandler):
                 "post":post.content, "date":post.date_created.strftime("%A %d, %B %Y"),
                 "id":post.key().id()})
         self.write("<div> <em>Queried %s seconds ago</em></div>" % age)
+        self.write(html_footer)
         
 class BlogJson(BaseHandler):
     def get(self, post_id=None):
@@ -235,16 +295,16 @@ class ViewWikiPage(BaseHandler):
     def get(self, wiki_page_name=None):        
         version = self.request.get("version")
         logging.info("Getting page %s version %s" % (wiki_page_name, version))
-        
+        self.write(html_header)
         wiki_page, age, version = get_wiki_page(wiki_page_name, version)
         if wiki_page:
             user_name=self.request.cookies.get("name")
-            logging.info("Viewing page as user: %s"%user_name)
-            user_object = get_user_object(user_name)
+            logging.info("Viewing page as user: %s"%user.nickname())
+         #   user_object = get_user_object(user_name)
             if user_name:
                 logging.info("logged_in_wiki_header_view: %s"%wiki_page_name)
                 self.write(logged_in_wiki_header_view, 
-                        {'user_name':user_name, 
+                        {'user_name':user.nickname(), 
                     'wiki_page_name':wiki_page_name,
                     'version':version})
             else:
@@ -253,21 +313,35 @@ class ViewWikiPage(BaseHandler):
             self.write("<h2>%s</h2>" % re.sub('/','',wiki_page.subject))
             self.write(wiki_page.content)
             self.write("<div> <em>Queried %s seconds ago</em></div>" % age)            
+            self.write(html_footer)
         else:
             self.redirect("/wiki/_edit%s" % wiki_page_name)            
 
 class EditWikiPage(BaseHandler):
     
     def get(self, wiki_page_name):
-        user_name=self.request.cookies.get("name")
+        user = users.get_current_user()
+        self.write(html_header)
+        if not user:
+            logging.info("Not a user!")
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)
+            return
+        user.prefs =  db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+        if not user.prefs.can_edit:
+            logging.info("user: %s can't edit." % user.nickname())
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)
+            return
+
+        # user.nickname()=self.request.cookies.get("name")
         version=self.request.get("version")
-        if user_name:
-            user_object = get_user_object(user_name)
-            logging.debug("logged_in_wiki_header_edit: %s"%wiki_page_name)
-            self.write(logged_in_wiki_header_edit, 
-                    {'user_name':user_name, 'wiki_page_name': wiki_page_name})
-        else:
-            self.redirect('/login')        
+        # user_object = get_user_object(user_name)
+        logging.debug("logged_in_wiki_header_edit: %s"%wiki_page_name)
+        self.write(logged_in_wiki_header_edit, 
+                {'user_name':user.nickname(), 'wiki_page_name': wiki_page_name})            
 
         wiki_page, age, version = get_wiki_page(wiki_page_name, version)
         if wiki_page:
@@ -277,8 +351,25 @@ class EditWikiPage(BaseHandler):
         
         self.write(edit_wiki_form, {'wiki_page_name':wiki_page_name, 
                                     'wiki_page_contents':content, 'error':""})
-    
+        self.write(html_footer)
+        
     def post(self, wiki_page_name):
+        user = users.get_current_user()
+        self.write(html_header)
+        if not user:
+            logging.info("Not a user!")
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)
+            return
+        user.prefs =  db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+        if not user.prefs.can_edit:
+            logging.info("user: %s can't edit." % user.nickname())
+            self.write(edit_wiki_unauthorized_error)
+            self.write(html_footer)
+            return
+
         content = self.request.get("content")
         subject = self.request.get("subject")
         if not subject:
@@ -306,7 +397,7 @@ class EditWikiPage(BaseHandler):
 
 class WikiPageHistory(BaseHandler):
     def get(self, wiki_page_name):
-        
+        self.write(html_header)
         history = db.GqlQuery("Select * from WikiPage where subject = '%s'" 
                               % wiki_page_name)
         history = list(history)
@@ -320,7 +411,7 @@ class WikiPageHistory(BaseHandler):
                                      'content':version.content,
                                      'created':version.date_created})
         
-        
+        self.write(html_footer)
         memcache.flush_all()
     
                 

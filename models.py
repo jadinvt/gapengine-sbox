@@ -26,4 +26,9 @@ class User(db.Model):
     user_name = db.StringProperty(required=True)
     password = db.StringProperty(required=True)
     email = db.StringProperty()
-
+    user_id = db.IntegerProperty(required=True)
+    
+class UserPrefs(db.Model):    
+    user_id = db.StringProperty(required=True)
+    can_edit = db.BooleanProperty(default=False)
+    is_admin = db.BooleanProperty(default=False)
