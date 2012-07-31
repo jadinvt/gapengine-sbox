@@ -34,7 +34,7 @@ edit_wiki_unauthorized_error ="""
 """
 logged_in_wiki_header_edit = """
 <div>%(user_name)s | 
-<a href='/logout?redirect=/wiki%(wiki_page_name)s'>logout</a>
+<a href="%(logout_url)s">logout</a>
 """
 
 logged_in_wiki_header_view = """
@@ -42,8 +42,7 @@ logged_in_wiki_header_view = """
 <span><a href="/wiki/_edit%(wiki_page_name)s?version=%(version)s">edit</a>
 |<a href="/wiki/_history%(wiki_page_name)s">history</a> 
 </span>
-<span>%(user_name)s  (<a href="/logout?redirect=/wiki%(wiki_page_name)s">
-logout</a>)</span>
+<span>%(user_name)s  <a href="%(logout_url)s">logout</a></span>
 """
 
 logged_out_wiki_header = """
@@ -58,7 +57,7 @@ edit_wiki_form="""
     </div>
     <div>
     <label for="content">Page Contents: 
-    <input id="content" name="content" value="%(wiki_page_contents)s"/>
+    <textarea cols="80" rows="20" id="content" name="content">%(wiki_page_contents)s</textarea>
     <input id="subject" name="subject" type="hidden" value="%(wiki_page_name)s"/>
     </div>
     <div class = "error">
@@ -76,7 +75,7 @@ blog_post_form="""
     </div>
     <div>
     <label for="content">Post: 
-    <input id="content" name="content" value="%(post)s"/>
+    <textarea cols="80" rows="20" id="content" name="content">%(post)s</textarea>    
     </div>
     <div class = "error">
     %(error)s
@@ -92,6 +91,7 @@ post_listing="""
 %(post)s
 </div>
 </div>
+<br/>
 <em>Posted on %(date)s</em>
 """
 
@@ -185,7 +185,7 @@ def get_front_page():
             return posts, (datetime.now() - time).seconds        
         logging.info("DB HIT (blog front page)")
         posts = db.GqlQuery("SELECT * "
-                    "FROM BlogPost ")
+                    "FROM BlogPost order by date_created desc")
         posts = list(posts)
         time = datetime.now()
         memcache.set("front_page", (posts, time))
@@ -292,19 +292,23 @@ def get_user_object(user_name):
     return user_object
 
 class ViewWikiPage(BaseHandler):
-    def get(self, wiki_page_name=None):        
+    def get(self, wiki_page_name=None):
+        user = users.get_current_user()
+        self.write(html_header)
+        if user:
+            user.prefs =  db.GqlQuery(
+              "SELECT * FROM UserPrefs WHERE user_id = :1",
+              user.user_id()).get()
+        
         version = self.request.get("version")
-        logging.info("Getting page %s version %s" % (wiki_page_name, version))
         self.write(html_header)
         wiki_page, age, version = get_wiki_page(wiki_page_name, version)
         if wiki_page:
-            user_name=self.request.cookies.get("name")
-            logging.info("Viewing page as user: %s"%user.nickname())
          #   user_object = get_user_object(user_name)
-            if user_name:
-                logging.info("logged_in_wiki_header_view: %s"%wiki_page_name)
+            if user and user.prefs.can_edit:
                 self.write(logged_in_wiki_header_view, 
-                        {'user_name':user.nickname(), 
+                        {'logout_url': users.create_logout_url(self.request.uri),
+                         'user_name':user.nickname(), 
                     'wiki_page_name':wiki_page_name,
                     'version':version})
             else:
@@ -312,7 +316,7 @@ class ViewWikiPage(BaseHandler):
                 
             self.write("<h2>%s</h2>" % re.sub('/','',wiki_page.subject))
             self.write(wiki_page.content)
-            self.write("<div> <em>Queried %s seconds ago</em></div>" % age)            
+            self.write("<br/><br/><div> <em>Queried %s seconds ago</em></div>" % age)            
             self.write(html_footer)
         else:
             self.redirect("/wiki/_edit%s" % wiki_page_name)            
@@ -341,7 +345,8 @@ class EditWikiPage(BaseHandler):
         # user_object = get_user_object(user_name)
         logging.debug("logged_in_wiki_header_edit: %s"%wiki_page_name)
         self.write(logged_in_wiki_header_edit, 
-                {'user_name':user.nickname(), 'wiki_page_name': wiki_page_name})            
+                {'logout_url': users.create_logout_url(self.request.uri),
+                 'user_name':user.nickname(), 'wiki_page_name': wiki_page_name})            
 
         wiki_page, age, version = get_wiki_page(wiki_page_name, version)
         if wiki_page:

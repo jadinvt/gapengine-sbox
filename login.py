@@ -199,9 +199,13 @@ class Logout(BaseHandler):
                 str('%s=; Path=/' % cookie))
     def get(self):    
         self.unset_cookie("name")
+        
         user = users.get_current_user()
+        logging.info("Logging out!  User: %s"%user.nickname())
         if user:
-            self.redirect(users.create_logout_url(self.request.uri))
+            logout_url = users.create_logout_url(self.request.uri)
+            logging.info("Logging out!  User: %s"%logout_url)
+            self.redirect(logout_url)
         
         redirect = self.request.get("redirect")
         logging.info("redirect %s"%redirect)
@@ -220,7 +224,11 @@ class Login(BaseHandler):
             if not user.prefs:
                 user.prefs = UserPrefs(user_id=user.user_id())
             user.prefs.put()    
-            self.response.out.write('Hello <em>%s</em>! [<a href="%s">sign out</a>]' % (
+            self.response.out.write("""
+            Hello <em>%s</em>! [<a href="%s">sign out</a>] <br/>
+            <a href="/blog"> Go to the blog</a>
+            <a href="/wiki/"> Go to the wiki</a>
+            """% (
                 user.nickname(), users.create_logout_url(self.request.uri)))
             if user.prefs.can_edit:
                 self.write("You can edit!")
@@ -239,7 +247,7 @@ class Login(BaseHandler):
                 user.nickname(), users.create_logout_url(self.request.uri)))
         else:     # let user choose authenticator
             domain = self.request.POST.get('openid').split('@')[1]
-            login_url = users.create_login_url(federated_identity=domain)
+            login_url = users.create_login_url('/login', federated_identity=domain)
             self.response.headers.add_header('Content-Type' , 
                                          'application/json; charset=UTF-8')
             if domain in providers.values():
