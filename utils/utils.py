@@ -1,13 +1,16 @@
+import re
+import settings
+from google.appengine.ext import db
+from google.appengine.api import memcache
+from datetime import timedelta, datetime
 import webapp2
 import cgi
 import json
 import logging
-from google.appengine.ext import db
 from google.appengine.api import users
 from models import User, UserPrefs
 from base import BaseHandler
 import bcrypt
-import settings
 login_page="""
 <html>
 
@@ -259,26 +262,48 @@ class Login(BaseHandler):
             #for name, uri in providers.items():
             #    self.response.out.write('[<a href="%s">%s</a>]' % (
             #        users.create_login_url(federated_identity=uri), name))
-    
-class OldLogin(BaseHandler):
-    def check_password(self, password, hashed):
-        return bcrypt.hashpw(password, hashed) == hashed
-    def set_cookie(self, username):
-        self.response.headers.add_header('Set-Cookie', 
-                str('name=%s; Path=/' % username))
-    def get(self):    
-        self.write(login_form)
-    def post(self):
-        user = db.Query(User)
-        user.filter("user_name =", self.request.get("username"))        
-        user.get()
-        if user.count() and self.check_password(self.request.get("password"), 
-                user[0].password):
-            self.set_cookie(self.request.get("username"))
-            redirect =  self.request.get("redirect")
-            if redirect:
-                self.redirect("redirect")
-            self.redirect("/unit2/welcome")
+#logging.basicConfig(level=logging.INFO)
+KEEP_HISTORY=True
+html_header="""
+<html>
+<head>
+<link rel="stylesheet" type="text/css" href="/static/base.css" />
+</head>
+<body>
+<div id="content">
+"""
+
+html_footer="""
+</div>
+</body>
+</html>
+"""
+
+
+welcome="""
+<div>Welcome, %(name)s!</div>
+<div>Destinations
+<ul>
+<li><a href="/blog">Blog</a></li>
+<li><a href="/wiki/">Wiki</a></li>
+</ul>
+</div>
+"""
+
+class BaseHandler(webapp2.RequestHandler):
+    def write(self, template='', dictionary={'subject':'','post':'','error':''}):
+        self.response.out.write(template %  dictionary)
+        
+class Welcome(BaseHandler):
+    def get(self):
+        name = self.request.cookies.get("name")
+        if name:
+            self.write(welcome, {'name':name})
         else:
-            self.write(login_form, 
-                    {'error':"Invalid login"})    
+            self.redirect("/unit4/signup")    
+
+
+class Flush(BaseHandler):
+    def get(self):
+        self.write("Flushing")
+        memcache.flush_all()

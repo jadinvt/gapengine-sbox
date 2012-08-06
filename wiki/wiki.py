@@ -9,7 +9,7 @@ from models import BlogPost, WikiPage
 from google.appengine.ext import db
 from google.appengine.api import memcache
 from datetime import timedelta, datetime
-
+from base import BaseHandler
 #logging.basicConfig(level=logging.INFO)
 KEEP_HISTORY=True
 html_header="""
@@ -47,7 +47,7 @@ logged_in_wiki_header_view = """
 
 logged_out_wiki_header = """
 <div><a href=/login?redirect=%(wiki_page_name)s>login</a>
-|<a href=/signup?redirect=%(wiki_page_name)s>Signup</a>
+|<a href=/signup?redirect=%(wiki_page_name)s>signup</a>
 """
 
 edit_wiki_form="""
@@ -66,183 +66,12 @@ edit_wiki_form="""
     <input type="submit">
     </form>
 """
-blog_post_form="""
-<form  method="post" action="/unit3/blog/newpost">
-    <div>
-    <label for="subject">subject: 
-    <input id="subject"  name="subject" 
-    value="%(subject)s"/>
-    </div>
-    <div>
-    <label for="content">Post: 
-    <textarea cols="80" rows="20" id="content" name="content">%(post)s</textarea>    
-    </div>
-    <div class = "error">
-    %(error)s
-    </div>
-    <input type="submit">
-    </form>
-"""
-post_listing="""
-<div>
-<h2><a href="/unit3/blog/%(id)s">%(subject)s</a><h2>
-</div>
-<div>
-%(post)s
-</div>
-</div>
-<br/>
-<em>Posted on %(date)s</em>
-"""
-
-welcome="""
-<div>Welcome, %(name)s!</div>
-<div>Destinations
-<ul>
-<li><a href="/blog">Blog</a></li>
-<li><a href="/wiki/">Wiki</a></li>
-</ul>
-</div>
-"""
-
 history_line="""
 <div>%(version)s %(created)s %(content)s 
 <a href="/wiki%(wiki_page_name)s?version=%(version)s">view</a>|
 <a href="/wiki/_edit%(wiki_page_name)s?version=%(version)s">edit</a>
 </div>
 """
-class BaseHandler(webapp2.RequestHandler):
-    def write(self, template='', dictionary={'subject':'','post':'','error':''}):
-        self.response.out.write(template %  dictionary)
-        
-class Welcome(BaseHandler):
-    def get(self):
-        name = self.request.cookies.get("name")
-        if name:
-            self.write(welcome, {'name':name})
-        else:
-            self.redirect("/unit4/signup")    
-
-class NewPost(BaseHandler):
-    def get(self):
-        user = users.get_current_user()
-        if not user:
-            logging.info("Not a user!")
-            self.write(html_header)
-            self.write(edit_wiki_unauthorized_error)
-            self.write(html_footer)
-            return
-        user.prefs =  db.GqlQuery(
-              "SELECT * FROM UserPrefs WHERE user_id = :1",
-              user.user_id()).get()
-        if not user.prefs.can_edit:
-            logging.info("user: %s can't edit." % user.nickname())
-            self.write(html_header)
-            self.write(edit_wiki_unauthorized_error)
-            self.write(html_footer)            
-            return
-        self.write(html_header)
-        self.write(blog_post_form)
-        self.write(html_footer)
-        
-    
-    def post(self):
-        user = users.get_current_user()
-        if not user:
-            logging.info("Not a user!")
-            self.write(html_header)
-            self.write(edit_wiki_unauthorized_error)
-            self.write(html_footer)            
-            return
-        user.prefs =  db.GqlQuery(
-              "SELECT * FROM UserPrefs WHERE user_id = :1",
-              user.user_id()).get()
-        if not user.prefs.can_edit:
-            logging.info("user: %s can't edit." % user.nickname())
-            self.write(html_header)
-            self.write(edit_wiki_unauthorized_error)
-            self.write(html_footer)                   
-            return
-
-        subject = self.request.get("subject")
-        content = self.request.get("content")
-        if subject and content: 
-            newpost = BlogPost(subject=subject, content=content)
-            key = newpost.put()
-            memcache.set("front_page", None)
-            self.redirect("/unit3/blog/%s"%key.id())
-        else:
-            self.write(html_header)
-            self.write(blog_post_form, 
-                    {'subject':subject, 'content':content, 
-                        'error':"Both subject and content are required."})
-            self.write(html_footer)       
-
-def get_front_page():
-        posts_time = memcache.get("front_page")
-        if posts_time:
-            (posts, time) = posts_time
-            return posts, (datetime.now() - time).seconds        
-        logging.info("DB HIT (blog front page)")
-        posts = db.GqlQuery("SELECT * "
-                    "FROM BlogPost order by date_created desc")
-        posts = list(posts)
-        time = datetime.now()
-        memcache.set("front_page", (posts, time))
-        return posts, 0
-
-def get_individual_post(post_id):
-    post_time = memcache.get("BlogPost"+post_id)
-    if post_time:
-        (post, time) = post_time
-        return post, (datetime.now() - time).seconds
-    logging.info("DB HIT (indiv post)")
-    key = db.Key.from_path("BlogPost", int(post_id))
-    post = db.get(key)
-    time = datetime.now()
-    memcache.set("BlogPost"+post_id, (post, time))
-    return post, 0        
-
-class Blog(BaseHandler):
-    def get(self, post_id=None):
-        self.write(html_header)
-        self.write("<h1>%s</h1>"%settings.BLOG_NAME)
-        if not post_id or post_id == None:
-            posts, age = get_front_page()
-            for post in posts:
-                
-                self.write(post_listing, {"subject":post.subject, 
-                    "post":post.content, "date":post.date_created.strftime("%A %d, %B %Y"),
-                    "id":post.key().id()})
-        else:
-            post, age = get_individual_post(post_id)
-            #posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
-            self.write(post_listing,  {"subject":post.subject, 
-                "post":post.content, "date":post.date_created.strftime("%A %d, %B %Y"),
-                "id":post.key().id()})
-        self.write("<div> <em>Queried %s seconds ago</em></div>" % age)
-        self.write(html_footer)
-        
-class BlogJson(BaseHandler):
-    def get(self, post_id=None):
-        data_to_jsonify = []
-        if not post_id or post_id == None:
-            posts, age = get_front_page()
-            for post in posts:
-                data_to_jsonify.append({"subject":post.subject, 
-                    "content":post.content, "date":post.date_created.strftime("%A %d, %B %Y"),
-                    "id":str(post.key().id())})
-        else:
-            post, age = get_individual_post(post_id)
-            #posts = db.GqlQuery("SELECT * FROM BlogPost where ID = %s"%post_id)
-            data_to_jsonify = {"subject":post.subject, 
-                "content":post.content, 
-                "date":post.date_created.strftime("%A %d, %B %Y"),
-                "id":str(post.key().id())}
-        self.response.headers.add_header('Content-Type' , 
-                                         'application/json; charset=UTF-8')    
-        self.response.out.write(json.dumps(data_to_jsonify))
-        
 def get_wiki_page(wiki_page_name, version=None):
     if not version:
         try:
@@ -252,9 +81,10 @@ def get_wiki_page(wiki_page_name, version=None):
             logging.info("Version from db query %s" % version)
         except AttributeError: 
             version = 1
+    logging.info("Looking for %s in mche"%wiki_page_name.join(str(version)))        
     wiki_page_time = memcache.get(wiki_page_name.join(str(version)))
     if wiki_page_time:
-        logging.info("Page found in cache")
+        logging.info("Page found in cache %s", wiki_page_name)
         (wiki_page, time) = wiki_page_time
         return wiki_page, (datetime.now() - time).seconds, version
     logging.info("DB HIT (wiki_page) %s %s" %  (wiki_page_name, version))
@@ -295,6 +125,7 @@ class ViewWikiPage(BaseHandler):
     def get(self, wiki_page_name=None):
         user = users.get_current_user()
         self.write(html_header)
+        logging.info("ViewWikiPage %s", wiki_page_name)
         if user:
             user.prefs =  db.GqlQuery(
               "SELECT * FROM UserPrefs WHERE user_id = :1",

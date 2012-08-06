@@ -6,10 +6,21 @@ threadsafe: yes
 handlers:
 - url: /static
   static_dir: static
+  secure: always
+  
+- url: /wiki(.*)
+  script: wiki.urls.app
+  secure: always
+
+- url: /blog(.*)
+  script: blog.urls.app
+  secure: always
+
 - url: .*
   script: urls.app
   secure: always
-
+  
+  
 skip_files:
 - ^(.*/)?app\.yaml
 - ^(.*/)?app\.yml
