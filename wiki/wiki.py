@@ -1,9 +1,6 @@
-import webapp2
-import cgi
+
 import re
 import logging
-import json
-import settings
 from google.appengine.api import users
 from models import BlogPost, WikiPage
 from google.appengine.ext import db
