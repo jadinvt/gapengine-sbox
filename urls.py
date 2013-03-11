@@ -10,5 +10,6 @@ app = webapp2.WSGIApplication([
      ('.*/flush/?$', Flush),     
     ('.*/logout/?', Logout),
     ('.*/signup/?', NewUser),
+    ('.*', Welcome),
     ],
     debug=True)

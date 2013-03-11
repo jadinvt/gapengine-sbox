@@ -289,6 +289,11 @@ welcome="""
 </ul>
 </div>
 """
+welcome_login = """
+<div>
+Or shed you anonymity and <a href="/login">login</a>
+</div>
+"""
 
 class BaseHandler(webapp2.RequestHandler):
     def write(self, template='', dictionary={'subject':'','post':'','error':''}):
@@ -296,12 +301,15 @@ class BaseHandler(webapp2.RequestHandler):
         
 class Welcome(BaseHandler):
     def get(self):
-        name = self.request.cookies.get("name")
-        if name:
-            self.write(welcome, {'name':name})
-        else:
-            self.redirect("/unit4/signup")    
-
+        user = users.get_current_user()
+        if user:  # signed in already            
+            name = user.nickname()
+        else:    
+            name = "Anonymous User"
+        self.write(welcome, {'name':name})
+        
+        if not user:
+            self.write(welcome_login)
 
 class Flush(BaseHandler):
     def get(self):
